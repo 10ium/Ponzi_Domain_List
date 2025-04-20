@@ -5,7 +5,8 @@ import socket
 import urllib3.exceptions
 import logging
 from typing import List, Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
+import re # اضافه کردن ماژول re برای عبارات منظم
 
 # تنظیم لاگینگ برای ثبت خطاها و اطلاعات
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -24,9 +25,11 @@ def extract_domains(url: str, max_retries: int = 3, delay: int = 2) -> List[str]
     """
     domains = []
     retries = 0
+    page_number = 1  # برای پیگیری صفحاتی که پردازش می شوند
 
     while retries < max_retries:
         try:
+            logging.info(f"در حال پردازش صفحه: {page_number}, URL: {url}")  # لاگ صفحه فعلی
             # ارسال درخواست HTTP GET با یک user-agent
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'}
             response = requests.get(url, headers=headers)
@@ -54,6 +57,8 @@ def extract_domains(url: str, max_retries: int = 3, delay: int = 2) -> List[str]
                         if '.' in domain:  # فقط اگر شبیه دامنه باشد اضافه کنید
                             # حذف پروتکل (http://، https:// و غیره)
                             domain = domain.split('://')[-1].split('/')[0]
+                            domain = unquote(domain) # رفع کاراکترهای URL-encoded
+                            domain = re.sub(r'\[\.\]', '.', domain)  # حذف "[.]" با عبارت منظم
                             domains.append(domain)
                     except Exception as e:
                         logging.warning(f"URL نامعتبر پیدا شد: {href} - {e}")
@@ -61,15 +66,23 @@ def extract_domains(url: str, max_retries: int = 3, delay: int = 2) -> List[str]
             # مدیریت صفحه‌بندی (اگر صفحه بندی وجود دارد)
             next_page = soup.find('a', class_='next-page')  # مثال: صفحه بعدی
             if next_page:
-                url = next_page.get('href')
-                if not url.startswith(('http://', 'https://')):
-                    base_url =  url.split('/ponzi/')[0]
-                    url = base_url + url
-                logging.info(f"رفتن به صفحه بعدی: {url}")
-                time.sleep(delay)  # رعایت تاخیر
-                retries = 0 # ریست شمارنده
-                continue  # ادامه با صفحه بعدی
+                next_page_url = next_page.get('href')
+                if next_page_url:
+                    # Combine with base URL if relative URL
+                    if not next_page_url.startswith(('http://', 'https://')):
+                        base_url = urlparse(url).scheme + "://" + urlparse(url).netloc
+                        next_page_url = base_url + next_page_url
+                    url = next_page_url
+                    logging.info(f"رفتن به صفحه بعدی: {url}")
+                    time.sleep(delay)  # رعایت تاخیر
+                    retries = 0  # ریست شمارنده
+                    page_number += 1
+                    continue  # ادامه با صفحه بعدی
+                else:
+                    logging.info("دیگر هیچ صفحه بعدی وجود ندارد.")
+                    break
             else:
+                logging.info("دیگر هیچ صفحه بعدی وجود ندارد.")
                 break  # اگر صفحه بعدی وجود ندارد، حلقه را بشکنید
 
         except requests.exceptions.RequestException as e:
@@ -84,7 +97,7 @@ def extract_domains(url: str, max_retries: int = 3, delay: int = 2) -> List[str]
             logging.critical(f"خطای غیرمنتظره در پردازش {url}: {e}")
             break  # برای خطاهای غیرمنتظره متوقف شوید
 
-    return list(set(domains)) # حذف موارد تکراری
+    return list(set(domains))  # حذف موارد تکراری
 
 
 def main():
