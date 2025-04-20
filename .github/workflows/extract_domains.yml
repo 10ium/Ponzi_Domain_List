@@ -2,7 +2,7 @@ name: Extract Domains # نام گردش کار شما
 on:
   push: # راه‌اندازی گردش کار در هر هل
     branches:
-      - main # شاخه اصلی
+      - main # در شاخه اصلی
   schedule:
     - cron: '0 0 * * *'  # اجرای روزانه در 00:00 UTC
 jobs:
@@ -19,17 +19,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 # نصب کتابخانه های مورد نیاز
       - name: Run the script # اجرای اسکریپت پایتون و ذخیره خروجی
-        run: |
-          python extract_domains.py > results.txt  # خروجی را به results.txt هدایت می کند
-      - name: List files # لیست کردن فایل ها برای دیباگ
-        run: ls -la
-      - name: show results.txt
-        run: cat results.txt
+        run: python extract_domains.py > output.txt
+      - name: show output.txt content
+        run: cat output.txt
       - name: Commit and push results # اضافه کردن برای کامیت و فش خروجی (اختیاری)
         if: success() # فقط در صورت موفقیت اجرای اسکریپت اجرا شود
         run: |
           git config --local user.email "your-email@example.com" # پیکربندی اطلاعات گیت
           git config --local user.name "Your Name"
-          git add results.txt # فایل results.txt را اضافه می کند
+          git add output.txt # فایل output.txt را اضافه می کند
           git commit -m "Update extracted domains"
           git push
+
