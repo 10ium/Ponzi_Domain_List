@@ -6,10 +6,11 @@ import urllib3.exceptions
 import logging
 from typing import List, Optional
 from urllib.parse import urlparse, unquote
-import re # اضافه کردن ماژول re برای عبارات منظم
+import re  # اضافه کردن ماژول re برای عبارات منظم
 
 # تنظیم لاگینگ برای ثبت خطاها و اطلاعات
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 def extract_domains(url: str, max_retries: int = 3, delay: int = 2) -> List[str]:
     """
@@ -31,37 +32,27 @@ def extract_domains(url: str, max_retries: int = 3, delay: int = 2) -> List[str]
         try:
             logging.info(f"در حال پردازش صفحه: {page_number}, URL: {url}")  # لاگ صفحه فعلی
             # ارسال درخواست HTTP GET با یک user-agent
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'}
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'}
             response = requests.get(url, headers=headers)
             response.raise_for_status()  # افزایش خطا برای کدهای وضعیت بد
 
             # پارس کردن HTML با BeautifulSoup
             soup = BeautifulSoup(response.content, 'html.parser')
 
-            # پیدا کردن همه لینک ها (تغییر این بر اساس ساختار واقعی صفحه وب)
-            links = soup.find_all('a')  # مثال: استخراج از تگ های <a>
+            # پیدا کردن ردیف های جدول
+            table_rows = soup.find_all('tr')  # فرض می کند داده ها در یک جدول هستند
 
-            for link in links:
-                href = link.get('href')
-                if href:
-                    # اصلاح شده: استخراج نام دامنه از URL
-                    try:
-                        parsed_url = urlparse(href)
-                        if parsed_url.netloc:
-                            domain = parsed_url.netloc
-                        elif href.startswith('/'):
-                            base_url = urlparse(url)
-                            domain = base_url.netloc
-                        else:
-                            domain = href.split('/')[0]
-                        if '.' in domain:  # فقط اگر شبیه دامنه باشد اضافه کنید
-                            # حذف پروتکل (http://، https:// و غیره)
-                            domain = domain.split('://')[-1].split('/')[0]
-                            domain = unquote(domain) # رفع کاراکترهای URL-encoded
-                            domain = re.sub(r'\[\.\]', '.', domain)  # حذف "[.]" با عبارت منظم
-                            domains.append(domain)
-                    except Exception as e:
-                        logging.warning(f"URL نامعتبر پیدا شد: {href} - {e}")
+            for row in table_rows:
+                # پیدا کردن سلول های داده در ردیف
+                cells = row.find_all('td')
+                if len(cells) > 0:  # بررسی کنید که ردیف خالی نباشد
+                    # فرض می کند که نام دامنه در اولین سلول قرار دارد
+                    domain_cell = cells[0]
+                    domain_text = domain_cell.text.strip()
+                    if domain_text:
+                         domain = re.sub(r'\[\.\]', '.', domain_text)
+                         domains.append(domain)
 
             # مدیریت صفحه‌بندی (اگر صفحه بندی وجود دارد)
             next_page = soup.find('a', class_='next-page')  # مثال: صفحه بعدی
@@ -113,6 +104,7 @@ def main():
             print(domain)
     else:
         print("هیچ دامنه ای استخراج نشد.")
+
 
 if __name__ == "__main__":
     main()
