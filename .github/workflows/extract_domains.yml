@@ -20,9 +20,9 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y tesseract-ocr libtesseract-dev
+          sudo apt-get install -y chromium-driver chromium-browser
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4 pillow pytesseract
+          pip install selenium beautifulsoup4
 
       - name: Run Python script and capture output
         run: python extract_domains.py > output.txt
