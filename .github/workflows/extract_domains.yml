@@ -1,33 +1,38 @@
-name: Extract Domains # نام گردش کار شما
+name: Extract Domains
 on:
-  push: # راه‌اندازی گردش کار در هر هل
+  push:
     branches:
-      - main # در شاخه اصلی
+      - main
   schedule:
-    - cron: '0 0 * * *'  # اجرای روزانه در 00:00 UTC
+    - cron: '0 0 * * *'  # daily at 00:00 UTC
+
 jobs:
   extract_domains:
-    runs-on: ubuntu-latest # استفاده از یک ماشین لینوکس اوبونتو
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # واکشی کد مخزن
-      - name: Set up Python # نصب پایتون
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9' # یا هر نسخه پایتون مورد نیاز
-      - name: Install dependencies # نصب وابستگی ها
+          python-version: '3.9'
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests beautifulsoup4 # نصب کتابخانه های مورد نیاز
-      - name: Run the script # اجرای اسکریپت پایتون و ذخیره خروجی
+          pip install requests beautifulsoup4
+
+      - name: Run Python script and capture output
         run: python extract_domains.py > output.txt
-      - name: show output.txt content
+
+      - name: Show extracted domains
         run: cat output.txt
-      - name: Commit and push results # اضافه کردن برای کامیت و فش خروجی (اختیاری)
-        if: success() # فقط در صورت موفقیت اجرای اسکریپت اجرا شود
+
+      - name: Commit and push results
+        if: success()
         run: |
-          git config --local user.email "your-email@example.com" # پیکربندی اطلاعات گیت
+          git config --local user.email "your-email@example.com"
           git config --local user.name "Your Name"
-          git add output.txt # فایل output.txt را اضافه می کند
+          git add output.txt
           git commit -m "Update extracted domains"
           git push
-
