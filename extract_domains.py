@@ -8,6 +8,9 @@ from typing import List
 from urllib.parse import urlparse
 import re
 import json
+from io import BytesIO
+from PIL import Image
+import pytesseract
 
 # Configure logging
 logging.basicConfig(level=logging.INFO,
@@ -18,16 +21,8 @@ def extract_domains(url: str,
                     max_retries: int = 3,
                     delay: int = 2) -> List[str]:
     """
-    Extracts clean domain names from the "لیست هشدار" table on the given URL.
-    Supports both TablePress JSON data and HTML table parsing.
-
-    Args:
-        url (str): Page URL to extract domains from.
-        max_retries (int): Number of retries on failure.
-        delay (int): Base delay between retries.
-
-    Returns:
-        List[str]: List of unique domain names.
+    Extracts clean domain names from the "لیست هشدار" content on the given URL.
+    Supports TablePress JSON, HTML table, and OCR on embedded image.
     """
     domains = []
     retries = 0
@@ -48,31 +43,40 @@ def extract_domains(url: str,
                     table_json = json.loads(script.string)
                     rows = table_json.get('data', [])
                     logging.info(f"Parsed {len(rows)} rows from TablePress JSON.")
-                    for row in rows:
-                        if not row: continue
-                        cleaned = clean_domain(row[0])
-                        if cleaned:
-                            domains.append(cleaned)
+                    domains = [clean_domain(r[0]) for r in rows if r]
                     return unique(domains)
                 except json.JSONDecodeError:
-                    logging.warning('Invalid TablePress JSON, falling back to HTML table.')
+                    logging.warning('Invalid TablePress JSON, falling back.')
 
             # 2. HTML table parsing
             table = soup.find('table')
-            if not table:
-                logging.warning('No HTML <table> found.')
-                return []
+            if table:
+                rows = table.find_all('tr')
+                logging.info(f"Found {len(rows)} HTML table rows.")
+                for tr in rows:
+                    cells = tr.find_all('td')
+                    if cells:
+                        d = clean_domain(cells[0].get_text(strip=True))
+                        if d:
+                            domains.append(d)
+                if domains:
+                    return unique(domains)
 
-            rows = table.find_all('tr')
-            logging.info(f"Found {len(rows)} HTML table rows.")
-            for tr in rows:
-                cells = tr.find_all('td')
-                if not cells: continue
-                cleaned = clean_domain(cells[0].get_text(strip=True))
-                if cleaned:
-                    domains.append(cleaned)
+            # 3. OCR fallback: find image containing table
+            images = soup.find_all('img')
+            for img in images:
+                src = img.get('src')
+                if src and 'webamooz' in src:
+                    img_url = src if src.startswith('http') else urlparse(url)._replace(path=src).geturl()
+                    logging.info(f"Attempting OCR on image: {img_url}")
+                    ocr_text = ocr_image(img_url)
+                    domains = parse_domains_from_text(ocr_text)
+                    if domains:
+                        return unique(domains)
 
-            break
+            # no data found
+            logging.warning('No domains extracted via any method.')
+            return []
 
         except (requests.RequestException, socket.error,
                 urllib3.exceptions.ReadTimeoutError) as e:
@@ -83,7 +87,7 @@ def extract_domains(url: str,
             logging.critical(f"Unexpected error: {e}")
             break
 
-    return unique(domains)
+    return []
 
 
 def clean_domain(raw: str) -> str:
@@ -94,19 +98,35 @@ def clean_domain(raw: str) -> str:
     domain = re.sub(r'^https?://', '', raw).rstrip('/')
     # De-obfuscate dots
     domain = domain.replace('[.]', '.')
-    # Validate format
+    # Validate with urlparse
     parsed = urlparse('//' + domain)
     return parsed.netloc or ''
 
 
+def ocr_image(img_url: str) -> str:
+    """Download image and return extracted text via OCR."""
+    resp = requests.get(img_url)
+    resp.raise_for_status()
+    img = Image.open(BytesIO(resp.content))
+    text = pytesseract.image_to_string(img, lang='eng+fas')
+    return text
+
+
+def parse_domains_from_text(text: str) -> List[str]:
+    """Parse domain-like patterns from OCR text."""
+    # pattern matches word chars + [.] + word chars, with optional subdomains
+    matches = re.findall(r'([\w\-]+(?:\.[\w\-]+)*\[\.\][\w\-]+(?:\.[\w\-]+)*)', text)
+    cleaned = [clean_domain(m) for m in matches]
+    return [d for d in cleaned if d]
+
+
 def unique(items: List[str]) -> List[str]:
-    """Return unique items preserving order."""
     seen = set()
     result = []
-    for item in items:
-        if item and item not in seen:
-            seen.add(item)
-            result.append(item)
+    for it in items:
+        if it and it not in seen:
+            seen.add(it)
+            result.append(it)
     return result
 
 
