@@ -44,7 +44,9 @@ def extract_domains(url: str,
                     domain = re.sub(r'^https?://', '', text)
                     domain = domain.rstrip('/')
                     domain = domain.replace('[.]', '.')
-                    domains.append(domain)
+                    if domain not in domains:
+                        domains.append(domain)
+                        print(domain, flush=True)
                 except Exception:
                     continue
 
@@ -67,25 +69,19 @@ def extract_domains(url: str,
     finally:
         driver.quit()
 
-    seen = set()
-    unique_domains = []
-    for d in domains:
-        if d not in seen:
-            seen.add(d)
-            unique_domains.append(d)
-
-    return unique_domains
+    return domains
 
 def main():
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
     url = "https://www.webamooz.com/ponzi/"
-    extracted = extract_domains(url)
-    if extracted:
-        for d in extracted:
-            print(d)
-    else:
-        print("No domains extracted.")
+    domains = extract_domains(url)
+
+    # Write collected domains to file regardless of errors
+    if domains:
+        with open("output.txt", "w", encoding="utf-8") as f:
+            for domain in domains:
+                f.write(f"{domain}\n")
 
 if __name__ == '__main__':
     main()
