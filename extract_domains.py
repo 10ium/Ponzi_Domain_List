@@ -67,6 +67,9 @@ def extract_domains(url: str,
     except Exception as e:
         logging.error(f"Error during extraction: {e}")
     finally:
+        with open("output.txt", "w", encoding="utf-8") as f:
+            for domain in domains:
+                f.write(f"{domain}\n")
         driver.quit()
 
     return domains
@@ -75,13 +78,7 @@ def main():
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
     url = "https://www.webamooz.com/ponzi/"
-    domains = extract_domains(url)
-
-    # Write collected domains to file regardless of errors
-    if domains:
-        with open("output.txt", "w", encoding="utf-8") as f:
-            for domain in domains:
-                f.write(f"{domain}\n")
+    extract_domains(url)
 
 if __name__ == '__main__':
     main()
