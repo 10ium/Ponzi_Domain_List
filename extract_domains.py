@@ -1,6 +1,5 @@
 import logging
 import re
-import time
 from typing import List
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -11,9 +10,13 @@ from selenium.webdriver.support import expected_conditions as EC
 
 def setup_driver() -> webdriver.Chrome:
     options = Options()
+    # Headless mode for CI environments
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
+    # Explicitly set binary location for chromium
+    options.binary_location = '/usr/bin/chromium-browser'
+    # Ensure chromedriver is on PATH
     return webdriver.Chrome(options=options)
 
 
@@ -34,10 +37,12 @@ def extract_domains(url: str, timeout: int = 30) -> List[str]:
             text = cell.text.strip()
             if not text:
                 continue
+            # Clean up domain text
             domain = re.sub(r'^https?://', '', text)
             domain = domain.rstrip('/')
             domain = domain.replace('[.]', '.')
             domains.append(domain)
+        # Remove duplicates while preserving order
         return list(dict.fromkeys(domains))
 
     except Exception as e:
