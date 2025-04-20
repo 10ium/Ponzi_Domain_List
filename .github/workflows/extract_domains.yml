@@ -18,8 +18,8 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 # نصب کتابخانه های مورد نیاز
-      - name: Run the script # اجرای اسکریپت پایتون
-        run: python extract_domains.py > results.txt # فرض می کند نام اسکریپت شما extract_domains.py است و خروجی را به results.txt هدایت می کند
+      - name: Run the script # اجرای اسکریپت پایتون و ذخیره خروجی
+        run: python extract_domains.py > results.txt # خروجی را به results.txt هدایت می کند
       - name: Commit and push results # اضافه کردن برای کامیت و فش خروجی (اختیاری)
         if: success() # فقط در صورت موفقیت اجرای اسکریپت اجرا شود
         run: |
