@@ -42,12 +42,14 @@ def extract_domains(url: str, max_retries: int = 3, delay: int = 2) -> List[str]
             soup = BeautifulSoup(response.content, 'html.parser')
 
             # پیدا کردن جدول
-            table = soup.find('table')  #  پیدا کردن اولین جدول
+            table = soup.find('table')  # پیدا کردن اولین جدول
 
             if table:
+                logging.info("جدول پیدا شد.")  # لاگ پیدا شدن جدول
                 # پیدا کردن ردیف های جدول
                 table_rows = table.find_all('tr')
-    
+                logging.info(f"{len(table_rows)} ردیف در جدول پیدا شد.") # تعداد ردیف ها را لاگ کنید
+
                 for row in table_rows:
                     # پیدا کردن سلول های داده در ردیف
                     cells = row.find_all('td')
@@ -55,13 +57,17 @@ def extract_domains(url: str, max_retries: int = 3, delay: int = 2) -> List[str]
                         # فرض می کند که نام دامنه در اولین سلول قرار دارد
                         domain_cell = cells[0]
                         domain_text = domain_cell.text.strip()
+                        logging.info(f"مقدار domain_text: {domain_text}")  # محتوای domain_text را لاگ کنید
                         if domain_text:
                             domain = re.sub(r'\[\.\]', '.', domain_text)
                             domains.append(domain)
+                            logging.info(f"دامنه اضافه شد: {domain}") # لاگ کردن دامنه اضافه شده
+                    else:
+                         logging.info("ردیف خالی پیدا شد")
 
             else:
                 logging.warning("هیچ جدولی در صفحه پیدا نشد.")
-                break # اگر جدولی پیدا نشد حلقه را متوقف کنید
+                break  # اگر جدولی پیدا نشد حلقه را متوقف کنید
 
             # مدیریت صفحه‌بندی (اگر صفحه بندی وجود دارد)
             next_page = soup.find('a', class_='next-page')  # مثال: صفحه بعدی
@@ -97,6 +103,8 @@ def extract_domains(url: str, max_retries: int = 3, delay: int = 2) -> List[str]
             logging.critical(f"خطای غیرمنتظره در پردازش {url}: {e}")
             break  # برای خطاهای غیرمنتظره متوقف شوید
 
+    if not domains:
+        logging.info("هیچ دامنه ای استخراج نشد.")
     return list(set(domains))  # حذف موارد تکراری
 
 
@@ -113,6 +121,7 @@ def main():
             print(domain)
     else:
         print("هیچ دامنه ای استخراج نشد.")
+
 
 
 if __name__ == "__main__":
