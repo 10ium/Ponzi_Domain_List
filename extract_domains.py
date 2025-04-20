@@ -1,0 +1,105 @@
+import requests
+from bs4 import BeautifulSoup
+import time
+import socket
+import urllib3.exceptions
+import logging
+from typing import List, Optional
+from urllib.parse import urlparse
+
+# تنظیم لاگینگ برای ثبت خطاها و اطلاعات
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def extract_domains(url: str, max_retries: int = 3, delay: int = 2) -> List[str]:
+    """
+    دامنه ها را از یک URL با مدیریت خطا و منطق تکرار استخراج می کند.
+
+    Args:
+        url (str): URL برای استخراج دامنه ها.
+        max_retries (int, optional): حداکثر تعداد تلاش های مجدد برای درخواست های ناموفق. پیش فرض 3 است.
+        delay (int, optional): مدت زمان انتظار بین درخواست ها برای جلوگیری از محدودیت نرخ. پیش فرض 2 ثانیه است.
+
+    Returns:
+        List[str]: لیستی از دامنه های استخراج شده.
+    """
+    domains = []
+    retries = 0
+
+    while retries < max_retries:
+        try:
+            # ارسال درخواست HTTP GET با یک user-agent
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'}
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()  # افزایش خطا برای کدهای وضعیت بد
+
+            # پارس کردن HTML با BeautifulSoup
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # پیدا کردن همه لینک ها (تغییر این بر اساس ساختار واقعی صفحه وب)
+            links = soup.find_all('a')  # مثال: استخراج از تگ های <a>
+
+            for link in links:
+                href = link.get('href')
+                if href:
+                    # اصلاح شده: استخراج نام دامنه از URL
+                    try:
+                        parsed_url = urlparse(href)
+                        if parsed_url.netloc:
+                            domain = parsed_url.netloc
+                        elif href.startswith('/'):
+                            base_url = urlparse(url)
+                            domain = base_url.netloc
+                        else:
+                            domain = href.split('/')[0]
+                        if '.' in domain:  # فقط اگر شبیه دامنه باشد اضافه کنید
+                            # حذف پروتکل (http://، https:// و غیره)
+                            domain = domain.split('://')[-1].split('/')[0]
+                            domains.append(domain)
+                    except Exception as e:
+                        logging.warning(f"URL نامعتبر پیدا شد: {href} - {e}")
+
+            # مدیریت صفحه‌بندی (اگر صفحه بندی وجود دارد)
+            next_page = soup.find('a', class_='next-page')  # مثال: صفحه بعدی
+            if next_page:
+                url = next_page.get('href')
+                if not url.startswith(('http://', 'https://')):
+                    base_url =  url.split('/ponzi/')[0]
+                    url = base_url + url
+                logging.info(f"رفتن به صفحه بعدی: {url}")
+                time.sleep(delay)  # رعایت تاخیر
+                retries = 0 # ریست شمارنده
+                continue  # ادامه با صفحه بعدی
+            else:
+                break  # اگر صفحه بعدی وجود ندارد، حلقه را بشکنید
+
+        except requests.exceptions.RequestException as e:
+            logging.error(f"خطا در درخواست به {url}: {e}")
+            retries += 1
+            time.sleep(delay * retries)  # تاخیر تصاعدی
+        except (socket.error, urllib3.exceptions.ReadTimeoutError) as e:
+            logging.error(f"خطا در شبکه در {url}: {e}")
+            retries += 1
+            time.sleep(delay * retries)
+        except Exception as e:
+            logging.critical(f"خطای غیرمنتظره در پردازش {url}: {e}")
+            break  # برای خطاهای غیرمنتظره متوقف شوید
+
+    return list(set(domains)) # حذف موارد تکراری
+
+
+def main():
+    """
+    تابع اصلی برای اجرای اسکریپت.
+    """
+    target_url = "https://www.webamooz.com/ponzi/"  # URL هدف را اینجا مشخص کنید
+    extracted_domains = extract_domains(target_url)
+
+    if extracted_domains:
+        print("دامنه های استخراج شده:")
+        for domain in extracted_domains:
+            print(domain)
+    else:
+        print("هیچ دامنه ای استخراج نشد.")
+
+if __name__ == "__main__":
+    main()
