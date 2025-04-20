@@ -19,12 +19,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 # نصب کتابخانه های مورد نیاز
       - name: Run the script # اجرای اسکریپت پایتون
-        run: python extract_domains.py # فرض می کند نام اسکریپت شما extract_domains.py است
+        run: python extract_domains.py > results.txt # فرض می کند نام اسکریپت شما extract_domains.py است و خروجی را به results.txt هدایت می کند
       - name: Commit and push results # اضافه کردن برای کامیت و فش خروجی (اختیاری)
         if: success() # فقط در صورت موفقیت اجرای اسکریپت اجرا شود
         run: |
           git config --local user.email "your-email@example.com" # پیکربندی اطلاعات گیت
           git config --local user.name "Your Name"
-          git add results.txt # فرض می کند اسکریپت خروجی را در results.txt می نویسد
+          git add results.txt # فایل results.txt را اضافه می کند
           git commit -m "Update extracted domains"
           git push
