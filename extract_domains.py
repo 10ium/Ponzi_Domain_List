@@ -8,6 +8,7 @@ from typing import List, Optional
 from urllib.parse import urlparse, unquote
 import re  # اضافه کردن ماژول re برای عبارات منظم
 
+
 # تنظیم لاگینگ برای ثبت خطاها و اطلاعات
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -40,19 +41,27 @@ def extract_domains(url: str, max_retries: int = 3, delay: int = 2) -> List[str]
             # پارس کردن HTML با BeautifulSoup
             soup = BeautifulSoup(response.content, 'html.parser')
 
-            # پیدا کردن ردیف های جدول
-            table_rows = soup.find_all('tr')  # فرض می کند داده ها در یک جدول هستند
+            # پیدا کردن جدول
+            table = soup.find('table')  #  پیدا کردن اولین جدول
 
-            for row in table_rows:
-                # پیدا کردن سلول های داده در ردیف
-                cells = row.find_all('td')
-                if len(cells) > 0:  # بررسی کنید که ردیف خالی نباشد
-                    # فرض می کند که نام دامنه در اولین سلول قرار دارد
-                    domain_cell = cells[0]
-                    domain_text = domain_cell.text.strip()
-                    if domain_text:
-                         domain = re.sub(r'\[\.\]', '.', domain_text)
-                         domains.append(domain)
+            if table:
+                # پیدا کردن ردیف های جدول
+                table_rows = table.find_all('tr')
+    
+                for row in table_rows:
+                    # پیدا کردن سلول های داده در ردیف
+                    cells = row.find_all('td')
+                    if len(cells) > 0:  # بررسی کنید که ردیف خالی نباشد
+                        # فرض می کند که نام دامنه در اولین سلول قرار دارد
+                        domain_cell = cells[0]
+                        domain_text = domain_cell.text.strip()
+                        if domain_text:
+                            domain = re.sub(r'\[\.\]', '.', domain_text)
+                            domains.append(domain)
+
+            else:
+                logging.warning("هیچ جدولی در صفحه پیدا نشد.")
+                break # اگر جدولی پیدا نشد حلقه را متوقف کنید
 
             # مدیریت صفحه‌بندی (اگر صفحه بندی وجود دارد)
             next_page = soup.find('a', class_='next-page')  # مثال: صفحه بعدی
