@@ -9,7 +9,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-
 def setup_driver() -> webdriver.Chrome:
     options = Options()
     options.add_argument('--headless')
@@ -18,14 +17,13 @@ def setup_driver() -> webdriver.Chrome:
     options.binary_location = '/usr/bin/chromium-browser'
     return webdriver.Chrome(options=options)
 
-
 def extract_domains(url: str,
                     page_load_timeout: int = 30,
-                    delay_min: float = 1.0,
-                    delay_max: float = 3.0) -> List[str]:
+                    delay_min: float = 1.5,
+                    delay_max: float = 3.5) -> List[str]:
     """
     Loads all paginated pages via Selenium, extracts first-column domains,
-    respects random delays to avoid rate limits.
+    respects random delays to avoid rate limits and bot detection.
     """
     driver = setup_driver()
     driver.set_page_load_timeout(page_load_timeout)
@@ -34,8 +32,6 @@ def extract_domains(url: str,
     try:
         driver.get(url)
         while True:
-            logging.info(f"Processing page: {driver.current_url}")
-            # Wait until rows are present
             WebDriverWait(driver, page_load_timeout).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, 'tbody tr'))
             )
@@ -50,15 +46,21 @@ def extract_domains(url: str,
                 domain = domain.replace('[.]', '.')
                 domains.append(domain)
 
-            # Attempt to click "Next" button if available and enabled
             try:
-                next_btn = driver.find_element(By.CSS_SELECTOR, '.paginate_button.next:not(.disabled)')
-                next_btn.click()
-                sleep_time = random.uniform(delay_min, delay_max)
-                logging.info(f"Waiting {sleep_time:.2f}s before loading next page")
-                time.sleep(sleep_time)
-            except Exception:
-                logging.info("No further pages or "Next" disabled. Ending pagination.")
+                next_btn = driver.find_element(By.CSS_SELECTOR, '.paginate_button.next')
+                if "disabled" in next_btn.get_attribute("class"):
+                    logging.info('No further pages or "Next" disabled. Ending pagination.')
+                    break
+                else:
+                    # Scroll to button and click
+                    driver.execute_script("arguments[0].scrollIntoView(true);", next_btn)
+                    time.sleep(random.uniform(0.5, 1.5))
+                    next_btn.click()
+                    sleep_time = random.uniform(delay_min, delay_max)
+                    logging.info(f"Waiting {sleep_time:.2f}s before loading next page")
+                    time.sleep(sleep_time)
+            except Exception as e:
+                logging.warning(f"Could not find or click 'Next' button: {e}")
                 break
 
     except Exception as e:
@@ -75,7 +77,6 @@ def extract_domains(url: str,
             unique_domains.append(d)
     return unique_domains
 
-
 def main():
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
@@ -87,7 +88,6 @@ def main():
             print(d)
     else:
         print("No domains extracted.")
-
 
 if __name__ == '__main__':
     main()
