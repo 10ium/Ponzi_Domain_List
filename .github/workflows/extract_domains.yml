@@ -4,7 +4,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: '30 18 * * *'
+    - cron: '30 20 * * *'  # 00:00 Tehran
 
 jobs:
   extract_domains:
